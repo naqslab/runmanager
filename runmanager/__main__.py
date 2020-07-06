@@ -1484,9 +1484,39 @@ class RunManager(object):
             # Defer this until 50ms after the window has shown,
             # so that the GUI pops up faster in the meantime
             self.ui.firstPaint.connect(lambda: QtCore.QTimer.singleShot(50, load_the_config_file))
+            
+        # add a timer to check cycling status every X seconds
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.cycler)
+        # start timer with default time, set in main.ui to be 1s (1000ms)
+        self.cycle_time = int(self.ui.doubleSpinBox_cycle_time.value()*1000)
+        self.timer.start(self.cycle_time)
 
         splash.update_text('done')
         self.ui.show()
+        
+    def cycler(self):
+        # every timeout check if engage should be sent and update timer timeout
+        # don't engage if more than 1 shot would be compiled
+        # get shot number from engage button text string
+        shot_text = self.ui.pushButton_engage.text()
+        # relies on all digits in string being one number
+        try:
+            n_shots = int(''.join(filter(str.isdigit,shot_text)))
+        except ValueError:
+            # At start, sometimes cycle starts before shots are counted
+            # Ignore, ensure cycle is unchecked, then return
+            self.ui.checkBox_cycle.setChecked(False)
+            return
+        if self.ui.checkBox_cycle.isChecked() and n_shots == 1:
+            self.ui.pushButton_engage.click()
+        elif n_shots != 1:
+            # reset cycle checkbox if shots to compile > 1
+            self.ui.checkBox_cycle.setChecked(False)
+        
+        self.cycle_time = int(self.ui.doubleSpinBox_cycle_time.value()*1000)
+        if self.cycle_time != self.timer.interval():
+            self.timer.start(self.cycle_time)
 
     def setup_config(self):
         required_config_params = {"DEFAULT": ["apparatus_name"],
